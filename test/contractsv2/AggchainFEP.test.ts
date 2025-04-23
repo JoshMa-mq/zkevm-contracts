@@ -452,6 +452,8 @@ describe("AggchainFEP", () => {
         const rollupConfigHash = await aggchainFEPContract.rollupConfigHash();
         const optimisticMode = await aggchainFEPContract.optimisticMode();
         const trustedSequencerSC = await aggchainFEPContract.trustedSequencer();
+        const rangeVkeyCommitment = await aggchainFEPContract.rangeVkeyCommitment();
+        const aggregationVkey = await aggchainFEPContract.aggregationVkey();
 
         const aggchainParamsBytes = utilsFEP.computeHashAggchainParamsFEP(
             oldL2Output.outputRoot,
@@ -459,7 +461,9 @@ describe("AggchainFEP", () => {
             newl2BlockNumber,
             rollupConfigHash,
             optimisticMode,
-            trustedSequencerSC
+            trustedSequencerSC,
+            rangeVkeyCommitment,
+            aggregationVkey,
         );
 
         const consensusTypeSC = await aggchainFEPContract.CONSENSUS_TYPE();

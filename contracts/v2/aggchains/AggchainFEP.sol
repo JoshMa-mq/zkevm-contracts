@@ -415,8 +415,8 @@ contract AggchainFEP is AggchainBase {
     ///     length (bits):   | 32             | 256            | 256              |
     ///
     ///     aggchain_params:
-    ///     Field:           | l2PreRoot         | claimRoot          | claimBlockNum      | rollupConfigHash     | optimisticMode  | trustedSequencer |
-    ///     length (bits):   | 256               | 256                | 256                | 256                  | 8               | 160              |
+    ///     Field:           | l2PreRoot         | claimRoot          | claimBlockNum      | rollupConfigHash     | optimisticMode  | trustedSequencer | rangeVkeyCommitment | aggregationVkey |
+    ///     length (bits):   | 256               | 256                | 256                | 256                  | 8               | 160              | 256                 | 256             |
     ///
     /// @param aggchainData custom bytes provided by the chain
     ///     aggchainData:
@@ -469,7 +469,9 @@ contract AggchainFEP is AggchainBase {
                 _l2BlockNumber,
                 rollupConfigHash,
                 optimisticMode,
-                trustedSequencer
+                trustedSequencer,
+                rangeVkeyCommitment,
+                aggregationVkey
             )
         );
 

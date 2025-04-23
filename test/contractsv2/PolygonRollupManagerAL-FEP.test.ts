@@ -13,16 +13,23 @@ import {
     PolygonPessimisticConsensus,
 } from "../../typechain-types";
 const { VerifierType, computeRandomBytes } = require("../../src/pessimistic-utils");
-const { CONSENSUS_TYPE, encodeInitAggchainManager } = require("../../src/utils-common-aggchain");
+
 const {
+    CONSENSUS_TYPE,
+    encodeInitAggchainManager,
+    getAggchainVKeySelector,
+    encodeInitializeBytesLegacy,
+    computeAggchainHash,
+ } = require("../../src/utils-common-aggchain");
+
+ const {
     AGGCHAIN_TYPE_FEP,
     encodeAggchainDataFEP,
     encodeInitializeBytesAggchainFEPv1,
     encodeInitializeBytesAggchainFEPv0,
+    computeHashAggchainParamsFEP,
 } = require("../../src/utils-aggchain-FEP");
 
-const {getAggchainVKeySelector} = require("../../src/utils-common-aggchain");
-const {encodeInitializeBytesLegacy} = require("../../src/utils-common-aggchain");
 const {NO_ADDRESS} = require("../../src/constants");
 
 describe("Polygon rollup manager aggregation layer v3: FEP", () => {
@@ -99,7 +106,7 @@ describe("Polygon rollup manager aggregation layer v3: FEP", () => {
             startingTimestamp: 0,
             submissionInterval: 5,
             optimisticModeManager: optModeManager.address,
-            aggregationVKey: ethers.id("aggregationVKey"),
+            aggregationVkey: ethers.id("aggregationVkey"),
             rangeVkeyCommitment: ethers.id("rangeVkeyCommitment"),
         };
 
@@ -371,6 +378,7 @@ describe("Polygon rollup manager aggregation layer v3: FEP", () => {
             .to.emit(aggchainFEPContract, "AcceptVKeyManagerRole")
             .withArgs(vKeyManager.address, admin.address);
     });
+
     it("should getAggchainHash using default gateway", async () => {
         // Add default aggchain verification key
         // Generate random aggchain verification key
@@ -405,20 +413,26 @@ describe("Polygon rollup manager aggregation layer v3: FEP", () => {
         const [, aggchainFEPAddress] = await createFEPRollup(rollupTypeIdFEP);
 
         // Get aggchain hash
-        const precomputedAggchainHash = ethers.solidityPackedKeccak256(
-            ["uint32", "bytes32", "bytes32"],
-            [
-                CONSENSUS_TYPE.GENERIC,
-                aggchainVKey,
-                ethers.solidityPackedKeccak256(
-                    ['bytes32', 'bytes32', 'uint256', 'uint256', 'bool', 'address'],
-                    [initParams.startingOutputRoot, newStateRoot, newl2BlockNumber, initParams.rollupConfigHash, false, trustedSequencer.address],
-                )
-            ]
+        const aggchainParamsBytes= computeHashAggchainParamsFEP(
+            initParams.startingOutputRoot,
+            newStateRoot,
+            newl2BlockNumber,
+            initParams.rollupConfigHash,
+            false,
+            trustedSequencer.address,
+            initParams.rangeVkeyCommitment,
+            initParams.aggregationVkey
         );
+
+        const aggchainHashJS = computeAggchainHash(
+            CONSENSUS_TYPE.GENERIC,
+            aggchainVKey,
+            aggchainParamsBytes
+        );
+
         const aggchainFEPFactory = await ethers.getContractFactory("AggchainFEP");
         const aggchainFEPContract = aggchainFEPFactory.attach(aggchainFEPAddress as string);
-        expect(await aggchainFEPContract.getAggchainHash(CUSTOM_DATA_FEP)).to.be.equal(precomputedAggchainHash);
+        expect(await aggchainFEPContract.getAggchainHash(CUSTOM_DATA_FEP)).to.be.equal(aggchainHashJS);
     });
 
     it("should verify a pessimistic proof for a FEP aggchain", async () => {
@@ -587,7 +601,7 @@ describe("Polygon rollup manager aggregation layer v3: FEP", () => {
             startingTimestamp: 0,
             submissionInterval: 5,
             optimisticModeManager: optModeManager.address,
-            aggregationVKey: ethers.id("aggregationVKey"),
+            aggregationVkey: ethers.id("aggregationVkey"),
             rangeVkeyCommitment: ethers.id("rangeVkeyCommitment"),
         };
 

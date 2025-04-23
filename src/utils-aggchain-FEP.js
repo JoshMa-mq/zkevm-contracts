@@ -122,6 +122,8 @@ function encodeAggchainDataFEP(aggchainVKeyVersion, outputRoot, l2BlockNumber) {
  * @param {BigInt} rollupConfigHash rollup config hash
  * @param {Bool} optimisticMode flag to optimistic mode
  * @param {String} trustedSequencer trusted sequencer address
+ * @param {String} rangeVkeyCommitment rangeVkeyCommitment
+ * @param {String} aggregationVkey aggregationVkey
  * @returns aggchain param hash
  */
 function computeHashAggchainParamsFEP(
@@ -131,11 +133,13 @@ function computeHashAggchainParamsFEP(
     rollupConfigHash,
     optimisticMode,
     trustedSequencer,
+    rangeVkeyCommitment,
+    aggregationVkey
 ) {
     // solidity lkeccak
     return ethers.solidityPackedKeccak256(
-        ['bytes32', 'bytes32', 'uint256', 'uint256', 'bool', 'address'],
-        [oldOutputRoot, newOutputRoot, l2BlockNumber, rollupConfigHash, optimisticMode, trustedSequencer],
+        ['bytes32', 'bytes32', 'uint256', 'uint256', 'bool', 'address', 'bytes32', 'bytes32'],
+        [oldOutputRoot, newOutputRoot, l2BlockNumber, rollupConfigHash, optimisticMode, trustedSequencer, rangeVkeyCommitment, aggregationVkey],
     );
 }
 
