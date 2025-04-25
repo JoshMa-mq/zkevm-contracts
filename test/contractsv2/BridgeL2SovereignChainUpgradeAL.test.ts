@@ -40,6 +40,7 @@ describe("BridgeL2SovereignChain Contract Upgrade AL", () => {
     let acc1: any;
     let emergencyBridgePauser: any;
     let globalExitRootRemover: any;
+    let proxiedTokensManager: any;
 
     const tokenName = "Matic Token";
     const tokenSymbol = "MATIC";
@@ -58,7 +59,7 @@ describe("BridgeL2SovereignChain Contract Upgrade AL", () => {
 
     beforeEach("Deploy contracts", async () => {
         // load signers
-        [deployer, rollupManager, acc1, bridgeManager, emergencyBridgePauser] = await ethers.getSigners();
+        [deployer, rollupManager, acc1, bridgeManager, emergencyBridgePauser, proxiedTokensManager] = await ethers.getSigners();
         globalExitRootRemover = deployer;
         // Set trusted sequencer as coinbase for sovereign chains
         await ethers.provider.send("hardhat_setCoinbase", [deployer.address]);
@@ -118,7 +119,8 @@ describe("BridgeL2SovereignChain Contract Upgrade AL", () => {
             ethers.Typed.address(bridgeManager),
             ethers.ZeroAddress,
             false,
-            emergencyBridgePauser.address
+            emergencyBridgePauser.address,
+            proxiedTokensManager.address,
         );
 
         // deploy token
@@ -288,7 +290,8 @@ describe("BridgeL2SovereignChain Contract Upgrade AL", () => {
                 ethers.Typed.address(bridgeManager.address),
                 ethers.ZeroAddress,
                 false,
-                emergencyBridgePauser.address
+                emergencyBridgePauser.address,
+                proxiedTokensManager.address,
             )
         ).to.be.revertedWithCustomError(sovereignChainBridgeContract, "GasTokenNetworkMustBeZeroOnEther");
 
@@ -304,7 +307,8 @@ describe("BridgeL2SovereignChain Contract Upgrade AL", () => {
                 ethers.Typed.address(bridgeManager.address),
                 bridge.target, // Not zero, revert
                 false,
-                emergencyBridgePauser.address
+                emergencyBridgePauser.address,
+                proxiedTokensManager.address,
             )
         ).to.be.revertedWithCustomError(sovereignChainBridgeContract, "InvalidSovereignWETHAddressParams");
 
@@ -319,7 +323,8 @@ describe("BridgeL2SovereignChain Contract Upgrade AL", () => {
                 ethers.Typed.address(bridgeManager.address),
                 ethers.ZeroAddress,
                 true, // Not false, revert
-                emergencyBridgePauser.address
+                emergencyBridgePauser.address,
+                proxiedTokensManager.address,
             )
         ).to.be.revertedWithCustomError(sovereignChainBridgeContract, "InvalidSovereignWETHAddressParams");
     });
@@ -365,7 +370,8 @@ describe("BridgeL2SovereignChain Contract Upgrade AL", () => {
             ethers.Typed.address(bridgeManager.address),
             ethers.ZeroAddress,
             false,
-            emergencyBridgePauser.address
+            emergencyBridgePauser.address,
+            proxiedTokensManager.address,
         )).to.be.revertedWithCustomError(sovereignChainBridgeContractFactory, "InvalidInitializeFunction");
 
         // Initialize upgrade
@@ -373,13 +379,16 @@ describe("BridgeL2SovereignChain Contract Upgrade AL", () => {
             [ethers.randomBytes(32)],
             [100, 200],
             emergencyBridgePauser.address,
+            proxiedTokensManager.address,
         )).to.revertedWithCustomError(sovereignChainBridgeContractFactory, "InputArraysLengthMismatch");
 
         await expect(bridge.initialize(
             [ethers.randomBytes(32)],
             [100],
             emergencyBridgePauser.address,
-        )).to.emit(bridge, "AcceptEmergencyBridgePauserRole").withArgs(ethers.ZeroAddress, emergencyBridgePauser.address);
+            proxiedTokensManager.address,
+        )).to.emit(bridge, "AcceptEmergencyBridgePauserRole").withArgs(ethers.ZeroAddress, emergencyBridgePauser.address)
+        .to.emit(bridge, "AcceptProxiedTokensManagerRole").withArgs(ethers.ZeroAddress, proxiedTokensManager.address);;
 
         // deploy and initialize wrong initializer
         const bridge2 = await upgrades.deployProxy(sovereignChainBridgeContractFactory, [], {
@@ -391,6 +400,7 @@ describe("BridgeL2SovereignChain Contract Upgrade AL", () => {
             [ethers.randomBytes(32)],
             [100],
             emergencyBridgePauser.address,
+            proxiedTokensManager.address,
         )).to.be.revertedWithCustomError(sovereignChainBridgeContractFactory, "InvalidInitializeFunction");
 
         await bridge2.initialize(
@@ -403,7 +413,8 @@ describe("BridgeL2SovereignChain Contract Upgrade AL", () => {
             ethers.Typed.address(bridgeManager.address),
             ethers.ZeroAddress,
             false,
-            emergencyBridgePauser.address
+            emergencyBridgePauser.address,
+            proxiedTokensManager.address,
         )
     });
 
@@ -980,7 +991,8 @@ describe("BridgeL2SovereignChain Contract Upgrade AL", () => {
                 ethers.Typed.address(bridgeManager),
                 ethers.ZeroAddress,
                 false,
-                emergencyBridgePauser.address
+                emergencyBridgePauser.address,
+                proxiedTokensManager.address
             )
         ).to.be.revertedWith("Initializable: contract is already initialized");
 

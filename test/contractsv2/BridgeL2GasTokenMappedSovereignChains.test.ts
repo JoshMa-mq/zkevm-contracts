@@ -38,6 +38,7 @@ describe("SovereignChainBridge Gas tokens mapped tests", () => {
     let acc1: any;
     let bridgeManager: any;
     let emergencyBridgePauser: any;
+    let proxiedTokensManager: any;
 
     const tokenName = "Matic Token";
     const tokenSymbol = "MATIC";
@@ -61,7 +62,7 @@ describe("SovereignChainBridge Gas tokens mapped tests", () => {
 
     beforeEach("Deploy contracts", async () => {
         // load signers
-        [deployer, rollupManager, acc1, bridgeManager, emergencyBridgePauser] = await ethers.getSigners();
+        [deployer, rollupManager, acc1, bridgeManager, emergencyBridgePauser, proxiedTokensManager] = await ethers.getSigners();
 
         // Set trusted sequencer as coinbase for sovereign chains
         await ethers.provider.send("hardhat_setCoinbase", [deployer.address]);
@@ -109,7 +110,8 @@ describe("SovereignChainBridge Gas tokens mapped tests", () => {
             ethers.Typed.address(bridgeManager.address),
             WETHToken.target,
             false,
-            emergencyBridgePauser.address
+            emergencyBridgePauser.address,
+            proxiedTokensManager.address,
         );
         expect(await sovereignChainBridgeContract.WETHToken()).to.be.equal(WETHToken.target);
     });

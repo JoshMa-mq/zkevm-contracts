@@ -85,14 +85,9 @@ interface IPolygonZkEVMBridgeV2 {
     error GasTokenNetworkMustBeZeroOnEther();
 
     /**
-     * @dev Thrown when the wrapped token deployment fails
-     */
-    error FailedTokenWrappedDeployment();
-
-    /**
      * @dev Thrown when the wrapped token proxy deployment fails
      */
-    error FailedTokenWrappedProxyDeployment();
+    error FailedProxyDeployment();
 
     /**
      * @dev Thrown when try to set a zero address to a non valid zero address field
@@ -103,6 +98,11 @@ interface IPolygonZkEVMBridgeV2 {
      * @dev Thrown when sender is not the proxied tokens manager
      */
     error OnlyProxiedTokensManager();
+
+    /**
+     * @dev Thrown when trying to call a function that only the pending ProxiedTokensManager can call.
+     */
+    error OnlyPendingProxiedTokensManager();
 
     function wrappedTokenToTokenInfo(
         address destinationAddress

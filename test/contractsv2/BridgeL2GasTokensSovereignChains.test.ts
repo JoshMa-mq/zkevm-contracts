@@ -38,6 +38,7 @@ describe("SovereignChainBridge Gas tokens tests", () => {
     let acc1: any;
     let bridgeManager: any;
     let emergencyBridgePauser: any;
+    let proxiedTokensManager: any;
 
     const tokenName = "Matic Token";
     const tokenSymbol = "MATIC";
@@ -61,7 +62,7 @@ describe("SovereignChainBridge Gas tokens tests", () => {
 
     beforeEach("Deploy contracts", async () => {
         // load signers
-        [deployer, rollupManager, acc1, bridgeManager, emergencyBridgePauser] = await ethers.getSigners();
+        [deployer, rollupManager, acc1, bridgeManager, emergencyBridgePauser, proxiedTokensManager] = await ethers.getSigners();
 
         // Set trusted sequencer as coinbase for sovereign chains
         await ethers.provider.send("hardhat_setCoinbase", [deployer.address]);
@@ -110,7 +111,8 @@ describe("SovereignChainBridge Gas tokens tests", () => {
                 ethers.Typed.address(bridgeManager.address),
                 ethers.ZeroAddress,
                 true, // Not false, revert
-                emergencyBridgePauser.address
+                emergencyBridgePauser.address,
+                proxiedTokensManager.address
             )
         ).to.be.revertedWithCustomError(sovereignChainBridgeContract, "InvalidSovereignWETHAddressParams");
 
@@ -124,7 +126,8 @@ describe("SovereignChainBridge Gas tokens tests", () => {
             ethers.Typed.address(bridgeManager.address),
             ethers.ZeroAddress,
             false,
-            emergencyBridgePauser.address
+            emergencyBridgePauser.address,
+            proxiedTokensManager.address
         );
 
         // calculate the weth address:

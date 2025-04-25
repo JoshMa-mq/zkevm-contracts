@@ -110,6 +110,7 @@ interface IBridgeL2SovereignChains is IPolygonZkEVMBridgeV2 {
         address _bridgeManager,
         address sovereignWETHAddress,
         bool _sovereignWETHAddressIsNotMintable,
-        address _emergencyBridgePauser
+        address _emergencyBridgePauser,
+        address _proxiedTokensManager
     ) external;
 }

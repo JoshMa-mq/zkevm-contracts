@@ -223,10 +223,11 @@ async function updateVanillaGenesis(genesis, chainID, initializeParams) {
         sovereignWETHAddressIsNotMintable,
         globalExitRootUpdater,
         globalExitRootRemover,
-        emergencyBridgePauser
+        emergencyBridgePauser,
+        proxiedTokensManager,
     } = initializeParams;
     const initializeData = sovereignBridgeFactory.interface.encodeFunctionData(
-        "initialize(uint32,address,uint32,address,address,bytes,address,address,bool, address)",
+        "initialize(uint32,address,uint32,address,address,bytes,address,address,bool, address,address)",
         [
             rollupID,
             gasTokenAddress,
@@ -237,7 +238,8 @@ async function updateVanillaGenesis(genesis, chainID, initializeParams) {
             bridgeManager,
             sovereignWETHAddress,
             sovereignWETHAddressIsNotMintable,
-            emergencyBridgePauser
+            emergencyBridgePauser,
+            proxiedTokensManager,
         ]
     );
     injectedTx.to = bridgeProxy.address;

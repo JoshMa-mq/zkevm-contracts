@@ -89,11 +89,6 @@ interface IPolygonZkEVMBridgeV2Pessimistic {
      */
     error FailedTokenWrappedDeployment();
 
-    /**
-     * @dev Thrown when the wrapped token proxy deployment fails
-     */
-    error FailedTokenWrappedProxyDeployment();
-
     function wrappedTokenToTokenInfo(
         address destinationAddress
     ) external view returns (uint32, address);

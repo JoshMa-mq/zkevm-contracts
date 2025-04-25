@@ -53,6 +53,7 @@ async function main() {
         "forkID",
         "consensusContract",
         "programVKey",
+        "proxiedTokensManager",
     ];
 
     for (const parameterName of mandatoryDeploymentParameters) {
@@ -550,6 +551,7 @@ async function main() {
             globalExitRootUpdater: sovereignParams.globalExitRootUpdater,
             globalExitRootRemover: sovereignParams.globalExitRootRemover,
             emergencyBridgePauser: sovereignParams.emergencyBridgePauser,
+            proxiedTokensManager: createRollupParameters.proxiedTokensManager,
         };
         genesis = await updateVanillaGenesis(genesis, chainID, initializeParams);
         // Add weth proxy and implementation address to deployment output if gas token address is provided and sovereignWETHAddress is not provided

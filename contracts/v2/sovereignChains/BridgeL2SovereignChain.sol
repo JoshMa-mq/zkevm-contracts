@@ -168,6 +168,7 @@ contract BridgeL2SovereignChain is
      * @param _sovereignWETHAddress sovereign WETH address
      * @param _sovereignWETHAddressIsNotMintable Flag to indicate if the wrapped ETH is not mintable
      * @param _emergencyBridgePauser emergency bridge pauser address, allowed to be zero if the chain wants to disable the feature to stop de bridge
+     * @param _proxiedTokensManager address of the proxied tokens manager
      */
     function initialize(
         uint32 _networkID,
@@ -179,7 +180,8 @@ contract BridgeL2SovereignChain is
         address _bridgeManager,
         address _sovereignWETHAddress,
         bool _sovereignWETHAddressIsNotMintable,
-        address _emergencyBridgePauser
+        address _emergencyBridgePauser,
+        address _proxiedTokensManager
     ) public virtual getInitializedVersion reinitializer(2) {
         if (_initializerVersion != 0) {
             revert InvalidInitializeFunction();
@@ -191,6 +193,8 @@ contract BridgeL2SovereignChain is
         bridgeManager = _bridgeManager;
         emergencyBridgePauser = _emergencyBridgePauser;
         emit AcceptEmergencyBridgePauserRole(address(0), emergencyBridgePauser);
+        proxiedTokensManager = _proxiedTokensManager;
+        emit AcceptProxiedTokensManagerRole(address(0), proxiedTokensManager);
 
         // Set gas token
         if (_gasTokenAddress == address(0)) {
@@ -241,11 +245,14 @@ contract BridgeL2SovereignChain is
      * Allow to initialize the LocalBalanceTree with the initial balances
      * @param tokenInfoHash Array of tokenInfoHash
      * @param amount Array of amount
+     * @param _emergencyBridgePauser Address of the emergencyBridgePauser role
+     * @param _proxiedTokensManager Address of the proxiedTokensManager role
      */
     function initialize(
         bytes32[] calldata tokenInfoHash,
         uint256[] calldata amount,
-        address _emergencyBridgePauser
+        address _emergencyBridgePauser,
+        address _proxiedTokensManager
     ) public getInitializedVersion reinitializer(2) {
         if (_initializerVersion == 0) {
             revert InvalidInitializeFunction();
@@ -262,6 +269,10 @@ contract BridgeL2SovereignChain is
         // Set emergency bridge pauser
         emergencyBridgePauser = _emergencyBridgePauser;
         emit AcceptEmergencyBridgePauserRole(address(0), emergencyBridgePauser);
+
+        // set proxied tokens manager
+        proxiedTokensManager = _proxiedTokensManager;
+        emit AcceptProxiedTokensManagerRole(address(0), proxiedTokensManager);
 
         // Initialize OZ contracts
         __ReentrancyGuard_init();
@@ -296,6 +307,15 @@ contract BridgeL2SovereignChain is
         override(IPolygonZkEVMBridgeV2, PolygonZkEVMBridgeV2)
         initializer
     {
+        revert InvalidInitializeFunction();
+    }
+
+    /**
+     * @notice Override the function to prevent the contract from being initialized with this initializer
+     */
+    function initialize(
+        address //proxiedTokensManager
+    ) external override(PolygonZkEVMBridgeV2) initializer {
         revert InvalidInitializeFunction();
     }
 
@@ -571,18 +591,6 @@ contract BridgeL2SovereignChain is
                 unsetGlobalIndexHashChain
             );
         }
-    }
-
-    /**
-     * @notice Function to deploy an upgradeable wrapped token without having to claim asset. It is used to upgrade legacy tokens to the new upgradeable token.
-     * @param salt The salt for the upgradeable wrapped token deployment, it's keccak256(abi.encodePacked(originNetwork, originTokenAddress)). Both zero in case of weth
-     * @param constructorArgs encoded metadata of the token, normally abi.encode("Token name", "Token symbol", decimals)
-     */
-    function deployWrappedToken(
-        bytes32 salt,
-        bytes memory constructorArgs
-    ) external onlyBridgeManager returns (address wrappedTokenProxy) {
-        wrappedTokenProxy = address(_deployWrappedToken(salt, constructorArgs));
     }
 
     /**
@@ -1065,25 +1073,6 @@ contract BridgeL2SovereignChain is
 
         if (leafType == _LEAF_TYPE_MESSAGE) {
             _increaseLocalBalanceTree(_MAINNET_NETWORK_ID, address(0), amount);
-        }
-    }
-
-    /**
-     * @notice Function to get the upgradeable wrapped token proxy admin address, it overrides because it behaves different in case of
-     * sovereign chains.
-     * @return proxyAdmin Address of the proxy admin
-     */
-    function _getWrappedTokenProxyAdmin()
-        internal
-        view
-        override
-        returns (address proxyAdmin)
-    {
-        /// @dev in case a chain has set bridge manager as zero address (for more decentralization) we set the proxy admin as wrappedTokenProxyAdmin which is address(1) because proxy contract doesn't support zero address as admin
-        /// @dev https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.7/contracts/proxy/ERC1967/ERC1967Upgrade.sol#L124
-        proxyAdmin = bridgeManager;
-        if (bridgeManager == address(0)) {
-            proxyAdmin = invalidWrappedTokenProxyAdmin;
         }
     }
 }

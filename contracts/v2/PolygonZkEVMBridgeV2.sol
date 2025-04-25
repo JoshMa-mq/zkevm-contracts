@@ -69,7 +69,8 @@ contract PolygonZkEVMBridgeV2 is
     string public constant BRIDGE_VERSION = "al-v0.3.0";
 
     // address 1 is set as proxy admin to not allow the proxy to be upgraded on mainnet
-    address public constant invalidWrappedTokenProxyAdmin = address(1);
+    address public constant INVALID_WTOKEN_PROXY_ADMIN =
+        0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
 
     // Network identifier
     uint32 public networkID;
@@ -107,13 +108,17 @@ contract PolygonZkEVMBridgeV2 is
     // This variable is set at the initialization of the contract in case there's a gas token different than ether, (gasTokenAddress != address(0) ) so a new wrapped Token will be deployed to handle ether that came from other networks
     TokenWrapped public WETHToken;
 
+    // Address of the proxied tokens manager, is the admin of proxied wrapped tokens
     address proxiedTokensManager;
+
+    //  This account will be able to accept the proxiedTokensManager role
+    address pendingProxiedTokensManager;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      */
-    uint256[49] private __gap;
+    uint256[48] private __gap;
 
     /**
      * @dev Emitted when bridge assets or messages to another network
@@ -151,11 +156,23 @@ contract PolygonZkEVMBridgeV2 is
     );
 
     /**
-     * @dev Emitted when a proxied tokens manager is updated
+     * @notice Emitted when the pending ProxiedTokensManager accepts the ProxiedTokensManager role.
+     * @param oldProxiedTokensManager The previous ProxiedTokensManager.
+     * @param newProxiedTokensManager The new ProxiedTokensManager.
      */
-    event UpdateProxiedTokensManager(
+    event AcceptProxiedTokensManagerRole(
         address oldProxiedTokensManager,
-        address proxiedTokensManager
+        address newProxiedTokensManager
+    );
+
+    /**
+     * @notice Emitted when the proxiedTokensManager starts the two-step transfer role setting a new pending proxiedTokensManager.
+     * @param currentProxiedTokensManager The current proxiedTokensManager.
+     * @param newProxiedTokensManager The new pending proxiedTokensManager.
+     */
+    event TransferProxiedTokensManagerRole(
+        address currentProxiedTokensManager,
+        address newProxiedTokensManager
     );
 
     constructor() {
@@ -164,6 +181,7 @@ contract PolygonZkEVMBridgeV2 is
         wrappedTokenBytecodeStorer = new TokenWrappedBridgeInitCode();
 
         // Deploy the implementation of the wrapped token contract
+        /// @dev its the address where proxy wrapped tokens with deterministic address will point
         wrappedTokenBridgeImplementation = address(
             new TokenWrappedBridgeUpgradeable()
         );
@@ -218,15 +236,21 @@ contract PolygonZkEVMBridgeV2 is
         __ReentrancyGuard_init();
     }
 
+    /**
+     * @notice initializer to set the proxiedTokensManager
+     * @param _proxiedTokensManager Address of the proxied tokens manager
+     * @dev This function is INSECURE in case you are deploying this contract in mainnet. This contract should only be used for testing or to upgrade productive bridge already deployed on mainnet
+     */
     function initialize(
         address _proxiedTokensManager
     ) external virtual reinitializer(2) {
+        // It's not allowed proxiedTokensManager to be zero on mainnet
         if (_proxiedTokensManager == address(0)) {
             revert InvalidZeroAddress();
         }
         proxiedTokensManager = _proxiedTokensManager;
 
-        emit UpdateProxiedTokensManager(address(0), _proxiedTokensManager);
+        emit AcceptProxiedTokensManagerRole(address(0), _proxiedTokensManager);
     }
 
     modifier onlyRollupManager() {
@@ -981,21 +1005,39 @@ contract PolygonZkEVMBridgeV2 is
         }
     }
 
+    /////////////////////////////////////////
+    //   ProxiedTokensManager functions   //
+    ////////////////////////////////////////
+
     /**
-     * @notice Updated proxied tokens manager address, recommended to set a timelock at this address after bootstrapping phase
-     * @param _proxiedTokensManager Proxied manager address
+     * @notice Starts the ProxiedTokensManager role transfer
+     * This is a two step process, the pending ProxiedTokensManager must accepted to finalize the process
+     * @param newProxiedTokensManager Address of the new pending ProxiedTokensManager
      */
-    function updateProxiedTokensManager(
-        address _proxiedTokensManager
+    function transferProxiedTokensManagerRole(
+        address newProxiedTokensManager
     ) external onlyProxiedTokensManager {
-        if (_proxiedTokensManager == address(0)) {
-            revert InvalidZeroAddress();
+        pendingProxiedTokensManager = newProxiedTokensManager;
+
+        emit TransferProxiedTokensManagerRole(
+            proxiedTokensManager,
+            newProxiedTokensManager
+        );
+    }
+
+    /**
+     * @notice Allow the current pending ProxiedTokensManagerR to accept the emergencyBridgeProxiedTokensManagerRePauser role
+     */
+    function acceptProxiedTokensManagerRole() external {
+        if (pendingProxiedTokensManager != msg.sender) {
+            revert OnlyPendingProxiedTokensManager();
         }
 
         address oldProxiedTokensManager = proxiedTokensManager;
-        proxiedTokensManager = _proxiedTokensManager;
+        proxiedTokensManager = pendingProxiedTokensManager;
+        delete pendingProxiedTokensManager;
 
-        emit UpdateProxiedTokensManager(
+        emit AcceptProxiedTokensManagerRole(
             oldProxiedTokensManager,
             proxiedTokensManager
         );
@@ -1202,7 +1244,7 @@ contract PolygonZkEVMBridgeV2 is
         /// @dev A bytecode stored on chain used to deploy the proxy in a way that ALWAYS it's used the same
         /// bytecode, therefore the same proxy addresses are the same in all chains
         bytes memory proxyInitBytecode = abi.encodePacked(
-            TOKEN_WRAPPED_PROXY_INIT(),
+            INIT_BYTECODE_TRANSPARENT_PROXY(),
             proxyConstructorArgs
         );
 
@@ -1217,7 +1259,7 @@ contract PolygonZkEVMBridgeV2 is
             )
         }
         if (address(newWrappedTokenProxy) == address(0))
-            revert FailedTokenWrappedProxyDeployment();
+            revert FailedProxyDeployment();
 
         ITransparentUpgradeableProxy wrappedTokenProxy = ITransparentUpgradeableProxy(
                 address(newWrappedTokenProxy)
@@ -1227,7 +1269,13 @@ contract PolygonZkEVMBridgeV2 is
         wrappedTokenProxy.upgradeTo(wrappedTokenBridgeImplementation);
 
         // Transfer proxy admin ownership to bridge manager
-        wrappedTokenProxy.changeAdmin(_getWrappedTokenProxyAdmin());
+        address wrappedTokenProxyAdmin = proxiedTokensManager;
+        /// @dev in case a chain has set proxiedTokensManager as zero address (for more decentralization) we set the proxy admin as wrappedTokenProxyAdmin which is address(1) because proxy contract doesn't support zero address as admin
+        /// @dev https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.7/contracts/proxy/ERC1967/ERC1967Upgrade.sol#L124
+        if (wrappedTokenProxyAdmin == address(0)) {
+            wrappedTokenProxyAdmin = INVALID_WTOKEN_PROXY_ADMIN;
+        }
+        wrappedTokenProxy.changeAdmin(wrappedTokenProxyAdmin);
 
         // Initialize the wrapped token
         (string memory name, string memory symbol, uint8 decimals) = abi.decode(
@@ -1238,25 +1286,7 @@ contract PolygonZkEVMBridgeV2 is
             .initialize(name, symbol, decimals);
     }
 
-    /**
-     * @notice Function to get the upgradeable wrapped token proxy admin address
-     * sovereign chains.
-     * @return wrappedTokenProxyAdmin Address of the proxy admin
-     */
-    function _getWrappedTokenProxyAdmin()
-        internal
-        view
-        virtual
-        returns (address wrappedTokenProxyAdmin)
-    {
-        wrappedTokenProxyAdmin = proxiedTokensManager;
-        if (wrappedTokenProxyAdmin == address(0)) {
-            wrappedTokenProxyAdmin = invalidWrappedTokenProxyAdmin;
-        }
-    }
-
     // Helpers to safely get the metadata from a token, inspired by https://github.com/traderjoe-xyz/joe-core/blob/main/contracts/MasterChefJoeV3.sol#L55-L95
-
     /**
      * @notice Provides a safe ERC20.symbol version which returns 'NO_SYMBOL' as fallback string
      * @param token The address of the ERC-20 token contract
@@ -1344,15 +1374,19 @@ contract PolygonZkEVMBridgeV2 is
     }
 
     /**
-     * @notice Returns the TOKEN_WRAPPED_PROXY_INIT from the TokenWrappedBridgeInitCode
+     * @notice Returns the INIT_BYTECODE_TRANSPARENT_PROXY from the TokenWrappedBridgeInitCode
      * @dev TokenWrappedBridgeInitCode is a contract that contains PolygonTransparentProxy as constant, it has done this way to have more bytecode available.
      *  Using the on chain bytecode, we assure that transparent proxy is always deployed with the exact same bytecode, necessary to have all deployed wrapped token
      *  with the same address on all the chains.
      */
-    function TOKEN_WRAPPED_PROXY_INIT() public view returns (bytes memory) {
+    function INIT_BYTECODE_TRANSPARENT_PROXY()
+        public
+        view
+        returns (bytes memory)
+    {
         return
             ITokenWrappedBridgeInitCode(wrappedTokenBytecodeStorer)
-                .TOKEN_WRAPPED_PROXY_INIT();
+                .INIT_BYTECODE_TRANSPARENT_PROXY();
     }
 
     /**
@@ -1380,7 +1414,7 @@ contract PolygonZkEVMBridgeV2 is
                 salt,
                 keccak256(
                     abi.encodePacked(
-                        TOKEN_WRAPPED_PROXY_INIT(),
+                        INIT_BYTECODE_TRANSPARENT_PROXY(),
                         proxyConstructorArgs
                     )
                 )

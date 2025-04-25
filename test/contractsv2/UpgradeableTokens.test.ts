@@ -20,7 +20,7 @@ describe("Upgradeable Tokens", () => {
     let emergencyBridgePauser: any;
     let vKeyManager: any;
     let rollupManager: any;
-    let aggchainManager: any;
+    let proxiedTokensManager: any;
     let bridgeManager: any;
     let bridgeManager2: any;
     let indexLET = 0;
@@ -47,7 +47,7 @@ describe("Upgradeable Tokens", () => {
         upgrades.silenceWarnings();
 
         // load signers
-        [deployer, rollupManager, receiver, emergencyBridgePauser, vKeyManager, aggchainManager, bridgeManager, bridgeManager2] = await ethers.getSigners();
+        [deployer, rollupManager, receiver, emergencyBridgePauser, vKeyManager, proxiedTokensManager, bridgeManager, bridgeManager2] = await ethers.getSigners();
 
         maticTokenFactory = await ethers.getContractFactory("ERC20PermitMock");
 
@@ -127,11 +127,12 @@ describe("Upgradeable Tokens", () => {
         sovereignBridgeContract = await upgrades.upgradeProxy(sovereignBridgeContract.target, sovBridgeFactory, {
             unsafeAllow: ["constructor", "missing-initializer-call", "missing-initializer"],
             call: {
-                fn: "initialize(bytes32[],uint256[],address)",
+                fn: "initialize(bytes32[],uint256[],address,address)",
                 args: [
                     [],
                     [],
                     emergencyBridgePauser.address,
+                    proxiedTokensManager.address,
                 ],
             },
         }) as unknown as BridgeL2SovereignChain;
@@ -159,7 +160,8 @@ describe("Upgradeable Tokens", () => {
             ethers.Typed.address(bridgeManager),
             ethers.ZeroAddress,
             false,
-            emergencyBridgePauser.address
+            emergencyBridgePauser.address,
+            proxiedTokensManager.address
         );
 
         // Get bridge proxy implementation address
@@ -203,7 +205,8 @@ describe("Upgradeable Tokens", () => {
             ethers.Typed.address(bridgeManager2),
             ethers.ZeroAddress,
             false,
-            emergencyBridgePauser.address
+            emergencyBridgePauser.address,
+            proxiedTokensManager.address
         );
 
         // Make a claim to deploy a wtoken
@@ -240,7 +243,8 @@ describe("Upgradeable Tokens", () => {
             ethers.Typed.address(bridgeManager),
             ethers.ZeroAddress,
             false,
-            emergencyBridgePauser.address
+            emergencyBridgePauser.address,
+            proxiedTokensManager.address
         );
         const wrappedTokenImplementationAddress = await sovereignBridgeContract.wrappedTokenBridgeImplementation();
         // Upgrade proxy
@@ -397,7 +401,7 @@ describe("Upgradeable Tokens", () => {
         const proxyFactory = await ethers.getContractFactory("TokenWrappedTransparentProxy");
         const wrappedTokenProxy = proxyFactory.attach(precalculatedWrappedAddress) as TokenWrappedTransparentProxy;
 
-        await wrappedTokenProxy.connect(bridgeManager).upgradeTo(
+        await wrappedTokenProxy.connect(proxiedTokensManager).upgradeTo(
             wrappedTokenNewImplementation.target
         );
 
